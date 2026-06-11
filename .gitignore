@@ -1,0 +1,39 @@
+# === C++ / Compilación ===
+# Archivos ejecutables y binarios compilados
+*.exe
+*.out
+*.app
+*.o
+*.obj
+
+# Carpetas de compilación (dependiendo de si usan CMake, Make o VS Code)
+build/
+.CMake/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+
+# === NodeJS / React ===
+# Dependencias de JavaScript (¡Pesan muchísimo, nunca se suben!)
+node_modules/
+dist/
+build-web/
+
+# === IDEs y Editores de Código ===
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.vcxproj
+*.user
+
+# === Sistema Operativo ===
+.DS_Store
+Thumbs.db
+
+# === Datos Locales del Proyecto ===
+# Ignorar las carpetas de bases de datos que simulen localmente para no ensuciar el Git
+*.bin
+/Universidad/
