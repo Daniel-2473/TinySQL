@@ -1,9 +1,14 @@
-cmake_minimum_required(VERSION 3.15)
-project(mi_servidor)
+cmake_minimum_required(VERSION 3.20)
+project(TinySQL)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 
-add_subdirectory(Crow)
+add_executable(TinySQL main.cpp)
 
-add_executable(servidor main.cpp)
-target_link_libraries(servidor Crow::Crow)
+target_include_directories(TinySQL PUBLIC
+    ${CMAKE_SOURCE_DIR}/boost_1_91_0
+    ${CMAKE_SOURCE_DIR}/Crow-1.3.2/include
+    /usr/include
+)
+
+target_compile_definitions(TinySQL PUBLIC CROW_USE_BOOST)

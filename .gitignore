@@ -37,3 +37,6 @@ Thumbs.db
 # Ignorar las carpetas de bases de datos que simulen localmente para no ensuciar el Git
 *.bin
 /Universidad/
+
+backend/boost_1_91_0/
+backend/Crow-1.3.2/
