@@ -12,6 +12,7 @@ build/
 CMakeCache.txt
 CMakeFiles/
 Makefile
+CMakeLists.txt
 
 # === NodeJS / React ===
 # Dependencias de JavaScript (¡Pesan muchísimo, nunca se suben!)
