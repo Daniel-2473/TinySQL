@@ -2,13 +2,12 @@
 
 crow::response QueryHandler::handleQuery(const crow::request& req) {
     auto json_entrante = crow::json::load(req.body);
-
+    std::cout << "JSON recibido: " << req.body << std::endl; // Debug: imprimir el JSON recibido
     if (!json_entrante) {
         QueryResult error;
         error.success        = false;
         error.message        = "JSON inválido";
         error.executionTimeMs = 0;
-
         crow::response res(400, toJson(error));
         addCorsHeaders(res);
         return res;
@@ -22,18 +21,11 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
     result.success         = true;
     result.message         = "OK";
     result.executionTimeMs = 4.32;
-
-    // Llenar columnas manualmente
-    result.columns[0] = "Carnet";
-    result.columns[1] = "Nombre";
-    result.columnCount = 2;
-
-    // Llenar filas manualmente
-    result.rows[0][0] = "20260102";
-    result.rows[0][1] = "Estudiante Alfa";
-    result.rows[1][0] = "20260304";
-    result.rows[1][1] = "Estudiante Beta";
-    result.rowCount   = 2;
+    result.columns         = {"Carnet", "Nombre"};
+    result.rows            = {
+        {"20260102", "Estudiante Alfa"},
+        {"20260304", "Estudiante Beta"}
+    };
 
     crow::response res(toJson(result));
     addCorsHeaders(res);
@@ -46,13 +38,11 @@ crow::json::wvalue QueryHandler::toJson(const QueryResult& result) {
     json["message"]         = result.message;
     json["executionTimeMs"] = result.executionTimeMs;
 
-    // Usar columnCount en vez de .size()
-    for (int i = 0; i < result.columnCount; i++)
+    for (int i = 0; i < result.columns.size(); i++)
         json["columns"][i] = result.columns[i];
 
-    // Usar rowCount y columnCount en vez de .size()
-    for (int i = 0; i < result.rowCount; i++)
-        for (int j = 0; j < result.columnCount; j++)
+    for (int i = 0; i < result.rows.size(); i++)
+        for (int j = 0; j < result.rows[i].size(); j++)
             json["data"][i][j] = result.rows[i][j];
 
     return json;

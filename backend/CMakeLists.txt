@@ -17,4 +17,9 @@ target_include_directories(TinySQL PUBLIC
     /usr/include
 )
 
+target_compile_definitions(TinySQL PUBLIC 
+    CROW_USE_BOOST
+    CROW_RETURNS_OK_ON_HTTP_OPTIONS_REQUEST
+)
+
 target_compile_definitions(TinySQL PUBLIC CROW_USE_BOOST)
