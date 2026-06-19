@@ -3,9 +3,15 @@
 #include "BST.h"
 #include "BTree.h"
 #include <map>
+#include <vector>
 using namespace std;
 extern map<string, BST<int>*>    bstIntIndexes;
 extern map<string, BTree<int>*>  btreeIntIndexes;
+
+struct RowValue {
+    string columnName;
+    string value; 
+};
 struct DatabaseRecord {
     char name[50];
     bool isActive;
@@ -54,3 +60,6 @@ int calculateRowSize(const string& databaseName, const string& tableName);
 int countColumns(const string& databaseName, const string& tableName);
 bool getTableRecord(const string& databaseName, const string& tableName, TableRecord& outRecord);
 void loadIndexes();
+void insertRow(const string& databaseName, const string& tableName, const vector<RowValue>& values);
+const char XOR_KEY = 0x5A; // clave secreta
+void xorEncryptDecrypt(char* buffer, int size);

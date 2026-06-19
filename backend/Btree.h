@@ -314,23 +314,24 @@ public:
         return searchHelper(root, key);
     }
 
-    void insert(T key, long position) {
-        if (root == nullptr) {
-            root = new BTreeNode<T>(true);
-            root->keys[0] = key;
-            root->positions[0] = position;
-            root->numKeys = 1;
-            return;
-        }
-        // Si la raíz está llena, la dividimos primero
-        if (root->numKeys == 2 * ORDER - 1) {
-            BTreeNode<T>* newRoot = new BTreeNode<T>(false);
-            newRoot->children[0] = root;
-            splitChild(newRoot, 0, root);
-            root = newRoot;
-        }
-        insertNonFull(root, key, position);
+    bool insert(T key, long position) {
+    if (search(key) != -1) return false; // ya existe
+    if (root == nullptr) {
+        root = new BTreeNode<T>(true);
+        root->keys[0] = key;
+        root->positions[0] = position;
+        root->numKeys = 1;
+        return true;
     }
+    if (root->numKeys == 2 * ORDER - 1) {
+        BTreeNode<T>* newRoot = new BTreeNode<T>(false);
+        newRoot->children[0] = root;
+        splitChild(newRoot, 0, root);
+        root = newRoot;
+    }
+    insertNonFull(root, key, position);
+    return true;
+}
 
     void remove(T key) {
         if (root == nullptr) {

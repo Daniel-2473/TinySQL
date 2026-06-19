@@ -381,6 +381,7 @@ void loadIndexes() {
         long filePos = 0;
         char* rowBuffer = new char[rowSize];
         while (tableFile.read(rowBuffer, rowSize)) {
+            xorEncryptDecrypt(rowBuffer, rowSize);
             int value;
             memcpy(&value, rowBuffer + colOffset, sizeof(int));
 
@@ -397,4 +398,142 @@ void loadIndexes() {
         cout << "Índice cargado: " << mapKey << " (" << indexType << ")" << endl;
     }
     indexFile.close();
+}
+
+
+void insertRow(const string& databaseName, const string& tableName, const vector<RowValue>& values) {
+    // 1. Verificar que la tabla existe y está completa
+    int rowSize = calculateRowSize(databaseName, tableName);
+    if (rowSize <= 0) return;
+
+    // 2. Obtener las columnas en orden de posición
+    fstream colFile;
+    colFile.open("SystemCatalog/SystemColumns.bin", ios::in | ios::binary);
+    vector<ColumnRecord> cols;
+    ColumnRecord cr;
+    while (colFile.read(reinterpret_cast<char*>(&cr), sizeof(ColumnRecord))) {
+        if (string(cr.databaseName) == databaseName && string(cr.tableName) == tableName) {
+            cols.push_back(cr);
+        }
+    }
+    colFile.close();
+
+    sort(cols.begin(), cols.end(), [](const ColumnRecord& a, const ColumnRecord& b) {
+        return a.position < b.position;
+    });
+
+    // 3. Verificar que llegan todos los valores necesarios
+    if ((int)values.size() != (int)cols.size()) {
+        cout << "Error: se esperaban " << cols.size() << " valores pero llegaron " << values.size() << endl;
+        return;
+    }
+
+    // 4. Construir el buffer binario de la fila
+    char* rowBuffer = new char[rowSize];
+    int offset = 0;
+
+    for (int i = 0; i < (int)cols.size(); i++) {
+        string type = string(cols[i].dataType);
+        string val  = values[i].value;
+
+        if (type == "INTEGER") {
+            int intVal = stoi(val);
+
+            // Verificar duplicado en índice si existe
+            string mapKey = databaseName + "." + tableName + "." + string(cols[i].columnName);
+            if (bstIntIndexes.count(mapKey)) {
+                if (bstIntIndexes[mapKey]->search(intVal) != -1) {
+                    cout << "Error: valor duplicado en columna indexada " << cols[i].columnName << endl;
+                    delete[] rowBuffer;
+                    return;
+                }
+            }
+            if (btreeIntIndexes.count(mapKey)) {
+                if (btreeIntIndexes[mapKey]->search(intVal) != -1) {
+                    cout << "Error: valor duplicado en columna indexada " << cols[i].columnName << endl;
+                    delete[] rowBuffer;
+                    return;
+                }
+            }
+
+            memcpy(rowBuffer + offset, &intVal, sizeof(int));
+            offset += sizeof(int);
+
+        } else if (type == "DOUBLE") {
+            double dblVal = stod(val);
+            memcpy(rowBuffer + offset, &dblVal, sizeof(double));
+            offset += sizeof(double);
+
+        } else if (type == "VARCHAR") {
+            memset(rowBuffer + offset, 0, cols[i].maxSize);
+            int copyLen = min((int)val.size(), cols[i].maxSize);
+            memcpy(rowBuffer + offset, val.c_str(), copyLen);
+            offset += cols[i].maxSize;
+
+        } else if (type == "DATETIME") {
+            DateTime dt;
+            sscanf(val.c_str(), "%d-%d-%d %d:%d:%d",
+                &dt.year, &dt.month, &dt.day,
+                &dt.hour, &dt.minute, &dt.second);
+            memcpy(rowBuffer + offset, &dt, sizeof(DateTime));
+            offset += sizeof(DateTime);
+        }
+    }
+
+    // 4.5 Guardar valores INTEGER ANTES de encriptar para actualizar índices después
+    vector<pair<string, int>> intValuesToIndex;
+    offset = 0;
+    for (int i = 0; i < (int)cols.size(); i++) {
+        string type   = string(cols[i].dataType);
+        string mapKey = databaseName + "." + tableName + "." + string(cols[i].columnName);
+        if (type == "INTEGER") {
+            int intVal;
+            memcpy(&intVal, rowBuffer + offset, sizeof(int));
+            intValuesToIndex.push_back({mapKey, intVal});
+            offset += sizeof(int);
+        } else if (type == "DOUBLE") {
+            offset += sizeof(double);
+        } else if (type == "VARCHAR") {
+            offset += cols[i].maxSize;
+        } else if (type == "DATETIME") {
+            offset += sizeof(DateTime);
+        }
+    }
+
+    // 5. Obtener posición actual ANTES de escribir
+    string tablePath = databaseName + "/" + tableName + ".bin";
+    fstream tableFile;
+    tableFile.open(tablePath, ios::in | ios::binary | ios::ate);
+    long filePos = tableFile.tellg();
+    tableFile.close();
+
+    // Encriptar y escribir
+    xorEncryptDecrypt(rowBuffer, rowSize);
+    tableFile.open(tablePath, ios::out | ios::binary | ios::app);
+    tableFile.write(rowBuffer, rowSize);
+    tableFile.close();
+
+    // 6. Actualizar índices en memoria con valores guardados antes de encriptar
+    for (auto& p : intValuesToIndex) {
+    string mapKey = p.first;
+    int intVal    = p.second;
+    if (bstIntIndexes.count(mapKey)) {
+        if (!bstIntIndexes[mapKey]->insert(intVal, filePos)) {
+            cout << "Error: duplicado en BST para " << mapKey << endl;
+        }
+    }
+    if (btreeIntIndexes.count(mapKey)) {
+        if (!btreeIntIndexes[mapKey]->insert(intVal, filePos)) {
+            cout << "Error: duplicado en BTree para " << mapKey << endl;
+        }
+    }
+}
+
+    delete[] rowBuffer;
+    cout << "Fila insertada correctamente en " << tableName << endl;
+}
+void xorEncryptDecrypt(char* buffer, int size) {
+    for (int i = 0; i < size; i++) {
+        buffer[i] ^= XOR_KEY;
+    }
 }

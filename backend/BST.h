@@ -104,9 +104,11 @@ public:
         root = nullptr;
     }
 
-    void insert(T key, long position) {
-        root = insertHelper(root, key, position);
-    }
+    bool insert(T key, long position) {
+    if (search(key) != -1) return false; // ya existe
+    root = insertHelper(root, key, position);
+    return true;
+}
 
     long search(T key) {
         return searchHelper(root, key);
