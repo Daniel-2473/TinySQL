@@ -13,7 +13,7 @@ add_executable(TinySQL
 target_include_directories(TinySQL PUBLIC
     ${CMAKE_SOURCE_DIR}/boost_1_91_0
     ${CMAKE_SOURCE_DIR}/Crow-1.3.2/include
-    ${CMAKE_SOURCE_DIR}/src          # para que encuentre api/, models/, etc.
+    ${CMAKE_SOURCE_DIR}/src
     /usr/include
 )
 
