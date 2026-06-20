@@ -3,10 +3,9 @@
 #include <vector>
 
 struct QueryResult {
-    bool        success;
+    bool        success = false;
     std::string message;
-    double      executionTimeMs;
-
+    double      executionTimeMs = 0.0;
     std::vector<std::string>              columns;
     std::vector<std::vector<std::string>> rows;
 };

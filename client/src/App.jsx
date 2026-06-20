@@ -28,7 +28,7 @@ function App() {
     const data = await response.json();
     setResult({
       status: data.status || "error",
-      message: data.message || "Error desconocido",
+      message: data.message || "",
       executionTimeMs: data.executionTimeMs || 0,
       columns: data.columns || [],
       data: data.data || [],

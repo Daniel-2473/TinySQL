@@ -5,6 +5,7 @@
 #include "query/SemanticValidator.h"
 #include "SystemCatalog.h"
 #include "StoredDataManager.h"
+#include "chrono"
 
 // currentDatabase persiste entre consultas (contexto activo)
 std::string QueryHandler::currentDatabase = "";
@@ -44,6 +45,8 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
         addCorsHeaders(res);
         return res;
     }
+
+    auto start = std::chrono::high_resolution_clock::now();
 
     // 5. Ejecutar con StoredDataManager
     StoredDataManager sdm;
@@ -95,6 +98,9 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
             result.message = "Tipo de consulta no soportado.";
             break;
     }
+    auto end = std::chrono::high_resolution_clock::now();
+    result.executionTimeMs =
+        std::chrono::duration<double, std::milli>(end - start).count();
 
     crow::response res(toJson(result));
     addCorsHeaders(res);
@@ -103,8 +109,9 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
 
 crow::json::wvalue QueryHandler::toJson(const QueryResult& result) {
     crow::json::wvalue json;
-    json["success"] = result.success;
-    json["message"] = result.message;
+    json["status"]          = result.success ? "success" : "error";  // ← este cambio
+    json["message"]         = result.message;
+    json["executionTimeMs"] = result.executionTimeMs;
 
     if (!result.columns.empty()) {
         crow::json::wvalue cols(crow::json::type::List);
