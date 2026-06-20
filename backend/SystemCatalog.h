@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include "BST.h"
-#include "BTree.h"
+#include "Btree.h"
 #include <map>
 #include <vector>
 using namespace std;

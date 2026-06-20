@@ -9,4 +9,5 @@ public:
 private:
     crow::json::wvalue toJson(const QueryResult& result);
     void addCorsHeaders(crow::response& res);
+    static std::string currentDatabase;
 };
