@@ -537,3 +537,198 @@ void xorEncryptDecrypt(char* buffer, int size) {
         buffer[i] ^= XOR_KEY;
     }
 }
+
+void dropTable(const string& databaseName, const string& tableName) {
+    // 1. Verificar que la tabla existe
+    if (!tableExists(databaseName, tableName)) {
+        cout << "Error: la tabla " << tableName << " no existe." << endl;
+        return;
+    }
+
+    // 2. Verificar que la tabla está vacía
+    string tablePath = databaseName + "/" + tableName + ".bin";
+    fstream tableFile;
+    tableFile.open(tablePath, ios::in | ios::binary | ios::ate);
+    long fileSize = tableFile.tellg();
+    tableFile.close();
+
+    if (fileSize > 0) {
+        cout << "Error: la tabla " << tableName << " no está vacía. No se puede eliminar." << endl;
+        return;
+    }
+
+    // 3. Eliminar el archivo .bin de la tabla
+    fs::remove(tablePath);
+
+    // 4. Reescribir SystemTables.bin sin esta tabla
+    fstream inFile, outFile;
+    inFile.open("SystemCatalog/SystemTables.bin", ios::in | ios::binary);
+    outFile.open("SystemCatalog/SystemTables_temp.bin", ios::out | ios::binary);
+    TableRecord tr;
+    while (inFile.read(reinterpret_cast<char*>(&tr), sizeof(TableRecord))) {
+        if (!(string(tr.databaseName) == databaseName && string(tr.tableName) == tableName)) {
+            outFile.write(reinterpret_cast<char*>(&tr), sizeof(TableRecord));
+        }
+    }
+    inFile.close();
+    outFile.close();
+    fs::remove("SystemCatalog/SystemTables.bin");
+    fs::rename("SystemCatalog/SystemTables_temp.bin", "SystemCatalog/SystemTables.bin");
+
+    // 5. Reescribir SystemColumns.bin sin las columnas de esta tabla
+    inFile.open("SystemCatalog/SystemColumns.bin", ios::in | ios::binary);
+    outFile.open("SystemCatalog/SystemColumns_temp.bin", ios::out | ios::binary);
+    ColumnRecord cr;
+    while (inFile.read(reinterpret_cast<char*>(&cr), sizeof(ColumnRecord))) {
+        if (!(string(cr.databaseName) == databaseName && string(cr.tableName) == tableName)) {
+            outFile.write(reinterpret_cast<char*>(&cr), sizeof(ColumnRecord));
+        }
+    }
+    inFile.close();
+    outFile.close();
+    fs::remove("SystemCatalog/SystemColumns.bin");
+    fs::rename("SystemCatalog/SystemColumns_temp.bin", "SystemCatalog/SystemColumns.bin");
+
+    // 6. Reescribir SystemIndexes.bin sin los índices de esta tabla
+    inFile.open("SystemCatalog/SystemIndexes.bin", ios::in | ios::binary);
+    outFile.open("SystemCatalog/SystemIndexes_temp.bin", ios::out | ios::binary);
+    IndexRecord ir;
+    while (inFile.read(reinterpret_cast<char*>(&ir), sizeof(IndexRecord))) {
+        if (!(string(ir.databaseName) == databaseName && string(ir.tableName) == tableName)) {
+            outFile.write(reinterpret_cast<char*>(&ir), sizeof(IndexRecord));
+        }
+    }
+    inFile.close();
+    outFile.close();
+    fs::remove("SystemCatalog/SystemIndexes.bin");
+    fs::rename("SystemCatalog/SystemIndexes_temp.bin", "SystemCatalog/SystemIndexes.bin");
+
+    // 7. Eliminar índices de memoria
+    for (auto it = bstIntIndexes.begin(); it != bstIntIndexes.end();) {
+        if (it->first.find(databaseName + "." + tableName + ".") == 0) {
+            delete it->second;
+            it = bstIntIndexes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (auto it = btreeIntIndexes.begin(); it != btreeIntIndexes.end();) {
+        if (it->first.find(databaseName + "." + tableName + ".") == 0) {
+            delete it->second;
+            it = btreeIntIndexes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    cout << "Tabla " << tableName << " eliminada correctamente." << endl;
+}
+
+void createIndex(const string& databaseName, const string& tableName, const string& columnName, const string& indexName, const string& indexType) {
+    // 1. Verificar que la tabla existe
+    if (!tableExists(databaseName, tableName)) {
+        cout << "Error: la tabla " << tableName << " no existe." << endl;
+        return;
+    }
+
+    // 2. Verificar que la columna existe
+    if (!columnExists(databaseName, tableName, columnName)) {
+        cout << "Error: la columna " << columnName << " no existe." << endl;
+        return;
+    }
+
+    // 3. Verificar que no hay ya un índice en esa columna
+    if (indexExists(databaseName, tableName, columnName)) {
+        cout << "Error: ya existe un indice en la columna " << columnName << "." << endl;
+        return;
+    }
+
+    // 4. Obtener tamaño de fila
+    int rowSize = calculateRowSize(databaseName, tableName);
+    if (rowSize <= 0) return;
+
+    // 5. Obtener columnas en orden de posición
+    fstream colFile;
+    colFile.open("SystemCatalog/SystemColumns.bin", ios::in | ios::binary);
+    vector<ColumnRecord> cols;
+    ColumnRecord cr;
+    while (colFile.read(reinterpret_cast<char*>(&cr), sizeof(ColumnRecord))) {
+        if (string(cr.databaseName) == databaseName && string(cr.tableName) == tableName) {
+            cols.push_back(cr);
+        }
+    }
+    colFile.close();
+
+    sort(cols.begin(), cols.end(), [](const ColumnRecord& a, const ColumnRecord& b) {
+        return a.position < b.position;
+    });
+
+    // 6. Calcular offset de la columna indexada
+    int colOffset = 0;
+    string dataType = "";
+    for (auto& c : cols) {
+        if (string(c.columnName) == columnName) {
+            dataType = string(c.dataType);
+            break;
+        }
+        string t = string(c.dataType);
+        if      (t == "INTEGER")  colOffset += sizeof(int);
+        else if (t == "DOUBLE")   colOffset += sizeof(double);
+        else if (t == "VARCHAR")  colOffset += c.maxSize;
+        else if (t == "DATETIME") colOffset += sizeof(DateTime);
+    }
+
+    // 7. Por ahora solo soportamos INTEGER
+    if (dataType != "INTEGER") {
+        cout << "Advertencia: por ahora solo se soportan indices sobre columnas INTEGER." << endl;
+        return;
+    }
+
+    // 8. Leer archivo .bin y verificar que no hay duplicados
+    string tablePath = databaseName + "/" + tableName + ".bin";
+    fstream tableFile;
+    tableFile.open(tablePath, ios::in | ios::binary);
+
+    vector<pair<int, long>> entries; // (valor, posicion)
+    char* rowBuffer = new char[rowSize];
+    long filePos = 0;
+
+    while (tableFile.read(rowBuffer, rowSize)) {
+        xorEncryptDecrypt(rowBuffer, rowSize); // desencriptar
+        int value;
+        memcpy(&value, rowBuffer + colOffset, sizeof(int));
+
+        // Verificar duplicado
+        for (auto& e : entries) {
+            if (e.first == value) {
+                cout << "Error: la columna " << columnName << " tiene valores duplicados. No se puede crear el indice." << endl;
+                delete[] rowBuffer;
+                tableFile.close();
+                return;
+            }
+        }
+        entries.push_back({value, filePos});
+        filePos += rowSize;
+    }
+    delete[] rowBuffer;
+    tableFile.close();
+
+    // 9. Registrar el índice en SystemIndexes.bin
+    addIndex(databaseName, tableName, columnName, indexName, indexType);
+
+    // 10. Construir el árbol en memoria
+    string mapKey = databaseName + "." + tableName + "." + columnName;
+    if (indexType == "BST") {
+        bstIntIndexes[mapKey] = new BST<int>();
+        for (auto& e : entries) {
+            bstIntIndexes[mapKey]->insert(e.first, e.second);
+        }
+    } else if (indexType == "BTREE") {
+        btreeIntIndexes[mapKey] = new BTree<int>();
+        for (auto& e : entries) {
+            btreeIntIndexes[mapKey]->insert(e.first, e.second);
+        }
+    }
+
+    cout << "Indice " << indexName << " creado correctamente sobre " << columnName << " (" << indexType << ")." << endl;
+}
