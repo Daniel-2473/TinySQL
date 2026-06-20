@@ -4,7 +4,7 @@
 #include <string>
 #include <stdio.h>
 #include "BST.h"
-#include "BTree.h"
+#include "Btree.h"
 #include <string.h>
 #include <iostream>
 #include <map>
