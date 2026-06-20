@@ -26,7 +26,13 @@ function App() {
     });
 
     const data = await response.json();
-    setResult(data);
+    setResult({
+      status: data.status || "error",
+      message: data.message || "Error desconocido",
+      executionTimeMs: data.executionTimeMs || 0,
+      columns: data.columns || [],
+      data: data.data || [],
+    });
   }
 
   return (

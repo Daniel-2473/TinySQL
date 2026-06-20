@@ -11,12 +11,15 @@ add_executable(TinySQL
     src/query/Lexer.cpp                  
     src/query/Parser.cpp                 
     src/query/SemanticValidator.cpp     
+    src/StoredDataManager.cpp 
+    Quicksort.cpp
 )
 
 target_include_directories(TinySQL PUBLIC
     ${CMAKE_SOURCE_DIR}/boost_1_91_0
     ${CMAKE_SOURCE_DIR}/Crow-1.3.2/include
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/models
     ${CMAKE_SOURCE_DIR}                
     /usr/include
 )

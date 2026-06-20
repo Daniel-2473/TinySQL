@@ -1,12 +1,12 @@
-#include "api/handlers/QueryHandler.h"  
-#include "crow.h"                      
+#include "api/handlers/QueryHandler.h"
+#include "crow.h"
 #include "query/Lexer.h"
 #include "query/Parser.h"
 #include "query/SemanticValidator.h"
 #include "SystemCatalog.h"
+#include "StoredDataManager.h"
 
-// El currentDatabase se guarda como atributo de la clase
-// porque persiste entre consultas
+// currentDatabase persiste entre consultas (contexto activo)
 std::string QueryHandler::currentDatabase = "";
 
 crow::response QueryHandler::handleQuery(const crow::request& req) {
@@ -20,8 +20,8 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
         return res;
     }
 
-    std::string query     = json_entrante["query"].s();
-    std::string clientDb  = json_entrante["currentDatabase"].s();
+    std::string query    = json_entrante["query"].s();
+    std::string clientDb = json_entrante["currentDatabase"].s();
 
     // 1. Lexer
     Lexer lexer(query);
@@ -35,7 +35,7 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
     SemanticValidator validator;
     validator.validate(parsed, currentDatabase);
 
-    // 4. Si hay error, devolver a React
+    // 4. Si hay error de sintaxis o semántica, devolver a React
     if (parsed.hasError) {
         QueryResult error;
         error.success = false;
@@ -45,21 +45,57 @@ crow::response QueryHandler::handleQuery(const crow::request& req) {
         return res;
     }
 
-    // 5. Si es SET DATABASE, actualizar el contexto
-    if (parsed.type == QueryType::SET_DATABASE) {
-        currentDatabase = parsed.databaseName;
-        QueryResult result;
-        result.success = true;
-        result.message = "Base de datos activa: " + currentDatabase;
-        crow::response res(toJson(result));
-        addCorsHeaders(res);
-        return res;
+    // 5. Ejecutar con StoredDataManager
+    StoredDataManager sdm;
+    QueryResult result;
+
+    switch (parsed.type) {
+
+        case QueryType::CREATE_DATABASE:
+            result = sdm.execCreateDatabase(parsed);
+            break;
+
+        case QueryType::SET_DATABASE:
+            // Solo actualizamos el contexto; la validación semántica ya verificó que existe
+            currentDatabase = parsed.databaseName;
+            result.success  = true;
+            result.message  = "Base de datos activa: " + currentDatabase;
+            break;
+
+        case QueryType::CREATE_TABLE:
+            result = sdm.execCreateTable(parsed, currentDatabase);
+            break;
+
+        case QueryType::DROP_TABLE:
+            result = sdm.execDropTable(parsed, currentDatabase);
+            break;
+
+        case QueryType::CREATE_INDEX:
+            result = sdm.execCreateIndex(parsed, currentDatabase);
+            break;
+
+        case QueryType::INSERT:
+            result = sdm.execInsert(parsed, currentDatabase);
+            break;
+
+        case QueryType::SELECT:
+            result = sdm.execSelect(parsed, currentDatabase);
+            break;
+
+        case QueryType::UPDATE:
+            result = sdm.execUpdate(parsed, currentDatabase);
+            break;
+
+        case QueryType::DELETE:
+            result = sdm.execDelete(parsed, currentDatabase);
+            break;
+
+        default:
+            result.success = false;
+            result.message = "Tipo de consulta no soportado.";
+            break;
     }
 
-    // 6. Aquí irá la ejecución real con StoredDataManager
-    QueryResult result;
-    result.success = true;
-    result.message = "Consulta válida. Ejecución pendiente.";
     crow::response res(toJson(result));
     addCorsHeaders(res);
     return res;

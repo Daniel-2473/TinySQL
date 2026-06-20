@@ -1,6 +1,6 @@
 function ResultTable({ columns, data }) {
-  if (columns.length === 0) {
-    return <p>No hay resultados.</p>;
+  if (!columns || columns.length === 0) {
+    return null;
   }
 
   return (

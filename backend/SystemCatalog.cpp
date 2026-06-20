@@ -138,11 +138,6 @@ void createTable(const string& databaseName, const string& tableName, int column
     file.close();
 }
 
-
-
-
-
-
 bool columnExists(const string& databaseName, const string& tableName, const string& columnName) {
     fstream file;
     file.open("SystemCatalog/SystemColumns.bin", ios::in | ios::binary);
