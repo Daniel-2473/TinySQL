@@ -60,7 +60,7 @@ int calculateRowSize(const string& databaseName, const string& tableName);
 int countColumns(const string& databaseName, const string& tableName);
 bool getTableRecord(const string& databaseName, const string& tableName, TableRecord& outRecord);
 void loadIndexes();
-void insertRow(const string& databaseName, const string& tableName, const vector<RowValue>& values);
+bool insertRow(const string& databaseName, const string& tableName, const vector<RowValue>& values);
 const char XOR_KEY = 0x5A; // clave secreta
 void xorEncryptDecrypt(char* buffer, int size);
 void dropTable(const string& databaseName, const string& tableName);

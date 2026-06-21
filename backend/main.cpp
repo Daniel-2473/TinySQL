@@ -15,6 +15,19 @@ int main() {
     // Inicializar el SystemCatalog (crea las carpetas y archivos .bin si no existen)
     initializeSystemCatalog();
     loadIndexes();
+    // ==== DIAGNÓSTICO: Verificar índices cargados ====
+    cout << "\n=== ÍNDICES CARGADOS EN MEMORIA ===" << endl;
+    cout << "BST Indexes: " << bstIntIndexes.size() << endl;
+    for (auto& kv : bstIntIndexes) {
+        cout << "  BST: " << kv.first << endl;
+        // Opcional: imprimir el contenido del árbol
+    }
+    cout << "BTree Indexes: " << btreeIntIndexes.size() << endl;
+    for (auto& kv : btreeIntIndexes) {
+        cout << "  BTree: " << kv.first << endl;
+        // Opcional: imprimir el contenido del árbol
+    }
+    cout << "=====================================\n" << endl;
 
     crow::App<crow::CORSHandler> app;
 

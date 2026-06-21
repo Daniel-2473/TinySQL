@@ -203,8 +203,7 @@ QueryResult StoredDataManager::execCreateIndex(const ParsedQuery& q, const strin
 QueryResult StoredDataManager::execInsert(const ParsedQuery& q, const string& db) {
     QueryResult result;
 
-    // Construir el vector<RowValue> que espera insertRow del SystemCatalog.
-    // Los valores llegan en q.insertValues en el mismo orden que las columnas de la tabla.
+    // Construir el vector<RowValue> que espera insertRow
     vector<ColumnRecord> cols = getColumns(db, q.tableName);
 
     if (q.insertValues.size() != cols.size()) {
@@ -222,13 +221,20 @@ QueryResult StoredDataManager::execInsert(const ParsedQuery& q, const string& db
         rowValues.push_back(rv);
     }
 
-    // insertRow maneja encriptación, verificación de duplicados en índices y actualización de árboles
-    ::insertRow(db, q.tableName, rowValues);
+    // Llamar a insertRow y capturar el resultado
+    bool success = ::insertRow(db, q.tableName, rowValues);
+    
+    if (!success) {
+        result.success = false;
+        result.message = "Error al insertar fila. Posible duplicado en columna indexada.";
+        return result;
+    }
 
     result.success = true;
     result.message = "Fila insertada correctamente en '" + q.tableName + "'.";
     return result;
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SELECT
