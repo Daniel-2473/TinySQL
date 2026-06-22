@@ -290,9 +290,23 @@ int countColumns(const string& databaseName, const string& tableName) {
 }
 
 void loadIndexes() {
+    cout << "📂 ENTRANDO A loadIndexes()" << endl;  // <--- NUEVO LOG
+    
     fstream indexFile;
     indexFile.open("SystemCatalog/SystemIndexes.bin", ios::in | ios::binary);
-
+    
+    if (!indexFile.is_open()) {
+        cout << "   ❌ No se pudo abrir SystemIndexes.bin" << endl;
+        return;
+    }
+    
+    cout << "   ✅ Archivo abierto correctamente" << endl;  // <--- NUEVO LOG
+    
+    // Verificar tamaño
+    indexFile.seekg(0, ios::end);
+    long fileSize = indexFile.tellg();
+    indexFile.seekg(0, ios::beg);
+    cout << "   📄 Tamaño: " << fileSize << " bytes" << endl;  // <--- NUEVO LOG
     IndexRecord indexRecord;
     while (indexFile.read(reinterpret_cast<char*>(&indexRecord), sizeof(IndexRecord))) {
         string dbName    = string(indexRecord.databaseName);
@@ -336,6 +350,11 @@ void loadIndexes() {
 
         // Leer el archivo .bin de la tabla y reconstruir el árbol
         int rowSize = calculateRowSize(dbName, tableName);
+        cout << "   rowSize calculado: " << rowSize << endl;
+if (rowSize <= 0) {
+    cout << "   ⚠️  rowSize inválido, saltando índice" << endl;
+    continue;
+}
         if (rowSize <= 0) continue;
 
         string tablePath = dbName + "/" + tableName + ".bin";
@@ -396,10 +415,13 @@ void loadIndexes() {
 }
 
 
-void insertRow(const string& databaseName, const string& tableName, const vector<RowValue>& values) {
+bool insertRow(const string& databaseName, const string& tableName, const vector<RowValue>& values) {
     // 1. Verificar que la tabla existe y está completa
     int rowSize = calculateRowSize(databaseName, tableName);
-    if (rowSize <= 0) return;
+    if (rowSize <= 0) {
+        cout << "Error: No se pudo calcular el tamaño de fila" << endl;
+        return false;
+    }
 
     // 2. Obtener las columnas en orden de posición
     fstream colFile;
@@ -420,7 +442,7 @@ void insertRow(const string& databaseName, const string& tableName, const vector
     // 3. Verificar que llegan todos los valores necesarios
     if ((int)values.size() != (int)cols.size()) {
         cout << "Error: se esperaban " << cols.size() << " valores pero llegaron " << values.size() << endl;
-        return;
+        return false;
     }
 
     // 4. Construir el buffer binario de la fila
@@ -436,18 +458,24 @@ void insertRow(const string& databaseName, const string& tableName, const vector
 
             // Verificar duplicado en índice si existe
             string mapKey = databaseName + "." + tableName + "." + string(cols[i].columnName);
+            
+            // Verificar en BST
             if (bstIntIndexes.count(mapKey)) {
-                if (bstIntIndexes[mapKey]->search(intVal) != -1) {
-                    cout << "Error: valor duplicado en columna indexada " << cols[i].columnName << endl;
+                long foundPos = bstIntIndexes[mapKey]->search(intVal);
+                if (foundPos != -1) {
+                    cout << "Error: valor duplicado en columna indexada " << cols[i].columnName << " (BST)" << endl;
                     delete[] rowBuffer;
-                    return;
+                    return false;
                 }
             }
+            
+            // Verificar en BTree
             if (btreeIntIndexes.count(mapKey)) {
-                if (btreeIntIndexes[mapKey]->search(intVal) != -1) {
-                    cout << "Error: valor duplicado en columna indexada " << cols[i].columnName << endl;
+                long foundPos = btreeIntIndexes[mapKey]->search(intVal);
+                if (foundPos != -1) {
+                    cout << "Error: valor duplicado en columna indexada " << cols[i].columnName << " (BTREE)" << endl;
                     delete[] rowBuffer;
-                    return;
+                    return false;
                 }
             }
 
@@ -510,22 +538,24 @@ void insertRow(const string& databaseName, const string& tableName, const vector
 
     // 6. Actualizar índices en memoria con valores guardados antes de encriptar
     for (auto& p : intValuesToIndex) {
-    string mapKey = p.first;
-    int intVal    = p.second;
-    if (bstIntIndexes.count(mapKey)) {
-        if (!bstIntIndexes[mapKey]->insert(intVal, filePos)) {
-            cout << "Error: duplicado en BST para " << mapKey << endl;
+        string mapKey = p.first;
+        int intVal    = p.second;
+        
+        if (bstIntIndexes.count(mapKey)) {
+            if (!bstIntIndexes[mapKey]->insert(intVal, filePos)) {
+                cout << "Error: duplicado en BST para " << mapKey << endl;
+            }
+        }
+        if (btreeIntIndexes.count(mapKey)) {
+            if (!btreeIntIndexes[mapKey]->insert(intVal, filePos)) {
+                cout << "Error: duplicado en BTree para " << mapKey << endl;
+            }
         }
     }
-    if (btreeIntIndexes.count(mapKey)) {
-        if (!btreeIntIndexes[mapKey]->insert(intVal, filePos)) {
-            cout << "Error: duplicado en BTree para " << mapKey << endl;
-        }
-    }
-}
 
     delete[] rowBuffer;
     cout << "Fila insertada correctamente en " << tableName << endl;
+    return true;
 }
 void xorEncryptDecrypt(char* buffer, int size) {
     for (int i = 0; i < size; i++) {
