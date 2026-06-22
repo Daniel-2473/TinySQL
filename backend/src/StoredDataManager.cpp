@@ -49,7 +49,14 @@ vector<string> StoredDataManager::bufferToStrings(const char* buf,
             char tmp[col.maxSize + 1];
             memset(tmp, 0, col.maxSize + 1);
             memcpy(tmp, buf + offset, col.maxSize);
-            result.push_back(string(tmp));
+            string s(tmp);
+            // Quitar caracteres nulos y espacios del final
+            size_t end = s.find_last_not_of(string("\0 ", 2));
+            if (end != string::npos)
+                s = s.substr(0, end + 1);
+            else
+                s = "";
+            result.push_back(s);
             offset += col.maxSize;
         } else if (type == "DATETIME") {
             DateTime dt; memcpy(&dt, buf + offset, sizeof(DateTime));
@@ -93,6 +100,12 @@ bool StoredDataManager::matchesWhere(const Row& row, const WhereClause& where,
     const string& val   = where.value;
     const string& op    = where.op;   // >, <, =, like, not
 
+    std::cout << "DEBUG matchesWhere:"
+              << " cell='" << cell << "'"
+              << " op='"   << op   << "'"
+              << " val='"  << val  << "'"
+              << " dataType='" << dataType << "'" << std::endl;
+
     if (op == "=") {
         if (dataType == "INTEGER") return stoi(cell) == stoi(val);
         if (dataType == "DOUBLE")  return stod(cell) == stod(val);
@@ -108,20 +121,22 @@ bool StoredDataManager::matchesWhere(const Row& row, const WhereClause& where,
         if (dataType == "DOUBLE")  return stod(cell) < stod(val);
         return cell < val;
     }
-    if (op == "like") {
-        // Soporta patrón *texto* (wildcard al inicio y/o final)
+    if (op == "LIKE") {
         string pattern = val;
         bool startWild = (!pattern.empty() && pattern.front() == '*');
         bool endWild   = (!pattern.empty() && pattern.back()  == '*');
         if (startWild) pattern = pattern.substr(1);
         if (endWild)   pattern = pattern.substr(0, pattern.size() - 1);
+
         if (startWild && endWild) return cell.find(pattern) != string::npos;
         if (startWild)            return cell.size() >= pattern.size() &&
-                                         cell.substr(cell.size() - pattern.size()) == pattern;
+                                        cell.substr(cell.size() - pattern.size()) == pattern;
         if (endWild)              return cell.substr(0, pattern.size()) == pattern;
-        return cell == pattern;
+
+        // Sin asteriscos: buscar si el patrón está contenido en cualquier parte
+        return cell.find(pattern) != string::npos;
     }
-    if (op == "not") {
+    if (op == "NOT") {
         if (dataType == "INTEGER") return stoi(cell) != stoi(val);
         if (dataType == "DOUBLE")  return stod(cell) != stod(val);
         return cell != val;

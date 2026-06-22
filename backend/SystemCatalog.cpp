@@ -727,3 +727,4 @@ void createIndex(const string& databaseName, const string& tableName, const stri
 
     cout << "Indice " << indexName << " creado correctamente sobre " << columnName << " (" << indexType << ")." << endl;
 }
+
