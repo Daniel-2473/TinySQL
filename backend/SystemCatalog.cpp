@@ -563,11 +563,11 @@ void xorEncryptDecrypt(char* buffer, int size) {
     }
 }
 
-void dropTable(const string& databaseName, const string& tableName) {
+bool dropTable(const string& databaseName, const string& tableName) {
     // 1. Verificar que la tabla existe
     if (!tableExists(databaseName, tableName)) {
         cout << "Error: la tabla " << tableName << " no existe." << endl;
-        return;
+        return false;
     }
 
     // 2. Verificar que la tabla está vacía
@@ -579,7 +579,7 @@ void dropTable(const string& databaseName, const string& tableName) {
 
     if (fileSize > 0) {
         cout << "Error: la tabla " << tableName << " no está vacía. No se puede eliminar." << endl;
-        return;
+        return false;  // <--- Cambiado: return false en lugar de return;
     }
 
     // 3. Eliminar el archivo .bin de la tabla
@@ -647,8 +647,8 @@ void dropTable(const string& databaseName, const string& tableName) {
     }
 
     cout << "Tabla " << tableName << " eliminada correctamente." << endl;
+    return true;  // <--- Nuevo: éxito
 }
-
 void createIndex(const string& databaseName, const string& tableName, const string& columnName, const string& indexName, const string& indexType) {
     // 1. Verificar que la tabla existe
     if (!tableExists(databaseName, tableName)) {

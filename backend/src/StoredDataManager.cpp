@@ -194,8 +194,23 @@ QueryResult StoredDataManager::execCreateTable(const ParsedQuery& q, const strin
 
 QueryResult StoredDataManager::execDropTable(const ParsedQuery& q, const string& db) {
     QueryResult result;
-    // SystemCatalog::dropTable ya verifica que esté vacía y limpia todo
-    ::dropTable(db, q.tableName);
+    
+    // Verificar que la tabla existe
+    if (!tableExists(db, q.tableName)) {
+        result.success = false;
+        result.message = "La tabla '" + q.tableName + "' no existe.";
+        return result;
+    }
+    
+    // Verificar que la tabla esté vacía (lo hace dropTable internamente)
+    bool success = ::dropTable(db, q.tableName);
+    
+    if (!success) {
+        result.success = false;
+        result.message = "No se pudo eliminar la tabla '" + q.tableName + "'. La tabla debe estar vacía para eliminarla.";
+        return result;
+    }
+    
     result.success = true;
     result.message = "Tabla '" + q.tableName + "' eliminada exitosamente.";
     return result;
